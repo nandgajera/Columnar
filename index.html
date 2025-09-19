@@ -2,101 +2,54 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Columnar Cipher + QR</title>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+  <title>Columnar Cipher Decryptor</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; }
-    textarea, input { width: 100%; margin: 5px 0; padding: 8px; }
-    button { margin: 8px 0; padding: 10px; width: 100%; }
-    #qrcode { margin: 20px auto; text-align: center; }
-    .output { background: #f4f4f4; padding: 10px; word-break: break-word; }
+    body { font-family: Arial, sans-serif; text-align: center; padding: 40px; }
+    input, button { margin: 10px; padding: 10px; font-size: 16px; }
+    #result { margin-top: 20px; font-weight: bold; color: green; }
   </style>
 </head>
 <body>
-  <h2>🔐 Columnar Cipher with QR</h2>
-
-  <h3>1. Encrypt & Generate QR</h3>
-  <textarea id="plaintext" placeholder="Enter message..."></textarea>
-  <input type="text" id="keywordEnc" placeholder="Enter keyword...">
-  <button onclick="encryptMessage()">Encrypt & Generate QR</button>
-  <div class="output"><b>Ciphertext:</b> <span id="ciphertext"></span></div>
-  <div id="qrcode"></div>
-
-  <hr>
-
-  <h3>2. Decrypt from Ciphertext</h3>
-  <textarea id="cipherInput" placeholder="Paste ciphertext..."></textarea>
-  <input type="text" id="keywordDec" placeholder="Enter keyword...">
-  <button onclick="decryptMessage()">Decrypt</button>
-  <div class="output"><b>Decrypted:</b> <span id="decrypted"></span></div>
+  <h1>🔐 Columnar Cipher Decryptor</h1>
+  <p>Enter the key used for encryption:</p>
+  
+  <input type="text" id="key" placeholder="Enter Key">
+  <button onclick="decrypt()">Decrypt</button>
+  
+  <div id="result"></div>
 
   <script>
-    function getColumnOrder(keyword) {
-      keyword = keyword.toUpperCase().replace(/[^A-Z]/g, "");
-      if (!keyword) throw new Error("Keyword must contain at least one letter");
-      let ranked = [...keyword].map((c, i) => [c.charCodeAt(0), i]);
-      ranked.sort((a, b) => a[0] - b[0]);
-      return ranked.map(x => x[1]);
-    }
+    // Read cipher from query param
+    const urlParams = new URLSearchParams(window.location.search);
+    const cipher = urlParams.get('cipher');
 
-    function columnarEncrypt(plaintext, keyword) {
-      keyword = keyword.toUpperCase().replace(/[^A-Z]/g, "");
-      let cols = keyword.length;
-      let rows = Math.ceil(plaintext.length / cols);
-      plaintext = plaintext.padEnd(rows * cols, "X");
-      let matrix = [];
+    function columnarDecrypt(cipher, key) {
+      if (!cipher || !key) return "Missing cipher or key!";
+      
+      const rows = Math.floor(cipher.length / key.length);
+      let m = {};
+      let start = 0;
+
+      [...key].sort().forEach(k => {
+        m[k] = cipher.slice(start, start + rows).split('');
+        start += rows;
+      });
+
+      let ordered = [...key].map(k => m[k]);
+      let plaintext = '';
+
       for (let i = 0; i < rows; i++) {
-        matrix.push(plaintext.slice(i*cols, (i+1)*cols));
-      }
-      let order = getColumnOrder(keyword);
-      let encrypted = "";
-      for (let col of order) {
-        for (let row of matrix) {
-          encrypted += row[col];
+        for (let col of ordered) {
+          plaintext += col[i];
         }
       }
-      return encrypted;
+      return plaintext.trim();
     }
 
-    function columnarDecrypt(ciphertext, keyword) {
-      keyword = keyword.toUpperCase().replace(/[^A-Z]/g, "");
-      let cols = keyword.length;
-      let rows = ciphertext.length / cols;
-      let order = getColumnOrder(keyword);
-      let matrix = Array(rows).fill("");
-      let idx = 0;
-      for (let col of order) {
-        for (let r = 0; r < rows; r++) {
-          matrix[r] += ciphertext[idx++];
-        }
-      }
-      return matrix.join("").replace(/X+$/, "");
-    }
-
-    function encryptMessage() {
-      let message = document.getElementById("plaintext").value;
-      let keyword = document.getElementById("keywordEnc").value;
-      try {
-        let cipher = columnarEncrypt(message, keyword);
-        document.getElementById("ciphertext").textContent = cipher;
-        document.getElementById("qrcode").innerHTML = "";
-        QRCode.toCanvas(document.createElement('canvas'), cipher, { width: 200 }, function (err, canvas) {
-          if (!err) document.getElementById("qrcode").appendChild(canvas);
-        });
-      } catch (e) {
-        alert(e.message);
-      }
-    }
-
-    function decryptMessage() {
-      let cipher = document.getElementById("cipherInput").value.trim();
-      let keyword = document.getElementById("keywordDec").value;
-      try {
-        let text = columnarDecrypt(cipher, keyword);
-        document.getElementById("decrypted").textContent = text;
-      } catch (e) {
-        alert(e.message);
-      }
+    function decrypt() {
+      const key = document.getElementById("key").value;
+      const result = columnarDecrypt(cipher, key);
+      document.getElementById("result").innerText = "Plaintext: " + result;
     }
   </script>
 </body>
